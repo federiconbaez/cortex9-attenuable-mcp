@@ -1,0 +1,36 @@
+[package]
+name = "attenuable-mcp"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+description = "Attenuable capability tokens for MCP tools/call: Biscuit checks over tool name and canonical arguments, bound to DPoP keys, with holder-signed delegation."
+authors = ["Federico Nicolas Báez Rizzo"]
+repository = "https://github.com/federiconbaez/cortex9-attenuable-mcp"
+readme = "README.md"
+keywords = ["mcp", "biscuit", "dpop", "capabilities", "authorization"]
+categories = ["authentication", "network-programming"]
+
+[lib]
+name = "attenuable_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "attn"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.22"
+biscuit-auth = "6.0.0"
+ed25519-dalek = "2"
+hex = "0.4.3"
+mcp-server-rs = { git = "https://github.com/federiconbaez/mcp-server-rs", rev = "9da13ddb13a4f33870873ce1fe8d995a3819f1a8" }
+rand_core = { version = "0.6", features = ["getrandom"] }
+serde = "1"
+serde_json = "1"
+sha2 = "0.11"
+tiny_http = "0.12"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
