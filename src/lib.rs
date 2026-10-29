@@ -6,6 +6,7 @@
 //! holder. See the README for what is and is not covered.
 
 pub mod b64;
+pub mod bench;
 pub mod canon;
 pub mod dpop;
 pub mod jwk;
