@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt · clippy · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test --all-targets --locked
+
+  suite:
+    name: attack suite (criterion a)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release
+        run: cargo build --release --locked
+      - name: Run suite (exit 1 unless every attack is refused and every control runs)
+        run: |
+          set -o pipefail
+          ./target/release/attn suite
+          ./target/release/attn suite --json > suite-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: suite-report
+          path: suite-report.json
+          if-no-files-found: error
+
+  bench:
+    name: verification latency (criterion b, reported)
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release
+        run: cargo build --release --locked
+      - name: Benchmark
+        run: |
+          set -o pipefail
+          lscpu | grep -E 'Model name|^CPU\(s\)' || true
+          ./target/release/attn bench --iters 20000 --warmup 2000 | tee bench-report.json
+          python3 - <<'PY'
+          import json
+          r = json.load(open("bench-report.json"))
+          for mode in ("verify_latency_cold", "verify_latency_cached_token"):
+              for level, s in r[mode].items():
+                  print(f"{mode:28} {level:18} p50={s['p50_us']:8.1f}us p99={s['p99_us']:8.1f}us")
+          for level, s in r["token_sizes"].items():
+              print(f"size {level:18} blocks={s['blocks']} bytes={s['bytes']} base64={s['base64_bytes']}")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-report
+          path: bench-report.json
+          if-no-files-found: error
