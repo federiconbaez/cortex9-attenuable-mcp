@@ -10,5 +10,6 @@ pub mod canon;
 pub mod dpop;
 pub mod jwk;
 pub mod middleware;
+pub mod suite;
 pub mod token;
 pub mod verifier;
