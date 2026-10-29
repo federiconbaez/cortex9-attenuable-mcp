@@ -1,5 +1,8 @@
 # cortex9-attenuable-mcp
 
+[![CI](https://github.com/federiconbaez/cortex9-attenuable-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/federiconbaez/cortex9-attenuable-mcp/actions/workflows/ci.yml)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+
 Tokens de capacidad atenuables para `tools/call` de MCP: Biscuit con chequeos Datalog sobre la herramienta y los argumentos canonicalizados, ligados a una clave DPoP (RFC 9449), con delegación agente → subagente firmada por el poseedor actual. Es una capa de autorización delante del transporte Streamable HTTP de [`mcp-server-rs`](https://github.com/federiconbaez/mcp-server-rs).
 
 *Attenuable capability tokens for MCP `tools/call`. English version below.*
@@ -62,11 +65,25 @@ Veredicto honesto:
 - (b) **cumple solo con el token en caché** (p99 148 µs con 3 niveles en la VM de desarrollo; ver CI abajo). **No cumple en frío**: con 3 niveles el p99 es ~534 µs, porque Biscuit verifica 4 firmas de bloque + 1 firma externa y la prueba DPoP agrega otra (`cargo run --release --example breakdown`: parseo + cadena de firmas ≈ 210 µs p50, prueba DPoP ≈ 46 µs p50). El primer uso de cada token paga ese costo.
 - Tamaño con 3 niveles: 1627 bytes (2172 en base64, lo que viaja en el header). El bloque de delegación es el más grande (~810 bytes) porque un third-party block trae su propia tabla de símbolos, la clave pública y la firma externa.
 
-Los resultados de los jobs de CI (`suite` y `bench` en `ubuntu-latest`) se registran en la sección siguiente.
+Los resultados de los jobs de CI (`suite` y `bench` en `ubuntu-latest`) están en la sección siguiente.
 
 ### Resultados en CI
 
-Pendiente de la primera corrida del CI en `main`.
+Primera corrida en `main` ([run 40809314290](https://github.com/federiconbaez/cortex9-attenuable-mcp/actions/runs/40809314290)), runner `ubuntu-latest` x86_64 con AMD EPYC 7763 (4 vCPU):
+
+| Job | Resultado |
+|---|---|
+| `fmt · clippy · test` | verde: `cargo fmt --check`, `clippy -D warnings`, 22 tests |
+| `attack suite (criterion a)` | verde: **34/34** ataques rechazados, **6/6** controles ejecutados |
+| `verification latency (criterion b, reported)` | verde (reporta, no es compuerta) |
+
+| Token | p50 frío | **p99 frío** | p50 en caché | **p99 en caché** |
+|---|---|---|---|---|
+| raíz (1 bloque) | 165.1 µs | 211.8 µs | 89.7 µs | 123.4 µs |
+| delegado (2 bloques) | 304.5 µs | 357.0 µs | 117.4 µs | 155.5 µs |
+| 3 niveles (4 bloques) | 429.2 µs | **484.2 µs** | 133.7 µs | **175.0 µs** |
+
+Tamaños idénticos a los de la VM de desarrollo (346 / 1158 / 1428 / 1627 bytes). En el runner se repite el veredicto: el p99 < 200 µs se cumple con el token en caché (175.0 µs con 3 niveles) y **no** en frío (484.2 µs con 3 niveles; tampoco con el token raíz, 211.8 µs). Solo se midió en runners x86_64.
 
 ### Qué está probado y qué no
 
@@ -140,11 +157,11 @@ Criterion (idea #43): *100% rejection of out-of-attenuation use (other tool/arg,
 - **(a)** `attn suite`: **34/34 attacks refused and never executed, 6/6 positive controls executed.** Each case is a full HTTP request through the layer into `mcp-server-rs`; an attack only counts as refused if the status is not 200 *and* the demo tool's call log did not grow.
 - **(b)** `attn bench --iters 20000 --warmup 2000` on the shared dev VM (8 vCPU Xeon, load average 5–10 from other builds): with a 3-level token (4 blocks, 1627 bytes, 2172 in base64; DPoP proof 513 bytes) p99 is **534 µs cold** (full Biscuit signature chain every request) and **148 µs with the token cached** (cache keyed by SHA-256 of the exact token string; DPoP signature, `jti` and all Datalog checks still run per request). Root token: 181 µs cold / 102 µs cached. **The < 200 µs target is met only on the cached path, not cold.** The cold cost is dominated by Biscuit's signature chain (≈210 µs p50 for 4 blocks + 1 external signature, `cargo run --release --example breakdown`).
 
-CI results are recorded below.
+CI results are in the next section.
 
 ### CI results
 
-Pending the first CI run on `main`.
+First run on `main` ([run 40809314290](https://github.com/federiconbaez/cortex9-attenuable-mcp/actions/runs/40809314290)), `ubuntu-latest` x86_64 runner, AMD EPYC 7763 (4 vCPU): all three jobs green. `attack suite`: **34/34** attacks refused, **6/6** controls executed. `bench` (reported, not a gate), 3-level token: p99 **484.2 µs cold**, **175.0 µs cached**; root token 211.8 µs cold / 123.4 µs cached; delegated 357.0 µs cold / 155.5 µs cached. Same verdict as on the dev VM: the < 200 µs p99 target holds on the cached path only. Only x86_64 runners were measured.
 
 ### Tested / not tested
 
